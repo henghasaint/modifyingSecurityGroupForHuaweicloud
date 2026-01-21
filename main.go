@@ -21,10 +21,11 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/spf13/viper"
-	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
-	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/errors"
-	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
-	vpc "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/vpc/v20170312"
+	"github.com/huaweicloud/huaweicloud-sdk-go-v3/core/auth/basic"
+	vpc "github.com/huaweicloud/huaweicloud-sdk-go-v3/services/vpc/v2"
+	"github.com/huaweicloud/huaweicloud-sdk-go-v3/services/vpc/v2/model"
+	"github.com/huaweicloud/huaweicloud-sdk-go-v3/services/vpc/v2/region"
+	"strconv"
 )
 
 type Creds struct {
@@ -291,90 +292,120 @@ func readWriteIPs(filePath string, ips []string, mode string) []string {
 	return nil
 }
 
-func geSG_version(sgID string, region string, credential *common.Credential) (*string, error) {
-	cpf := profile.NewClientProfile()
-	cpf.HttpProfile.Endpoint = "vpc.tencentcloudapi.com"
-	client, _ := vpc.NewClient(credential, region, cpf)
-	request := vpc.NewDescribeSecurityGroupPoliciesRequest()
-	request.SecurityGroupId = common.StringPtr(sgID)
-
-	response, err := client.DescribeSecurityGroupPolicies(request)
-	if err != nil {
-		return nil, err
-	}
-
-	return response.Response.SecurityGroupPolicySet.Version, nil
-}
-
-// 逐个替换安全组规则
+// 逐个替换安全组规则 (Huawei Cloud Version)
 func updateSecurityGroupPolicies(creds Creds, sg SecurityGroup, newIPs []string) error {
-	credential := common.NewCredential(
-		creds.SecretID,
-		creds.SecretKey,
-	)
-	cpf := profile.NewClientProfile()
-	cpf.HttpProfile.Endpoint = "vpc.tencentcloudapi.com"
-	client, _ := vpc.NewClient(credential, sg.Region, cpf)
-
-	fmt.Printf("%s 开始逐个更新安全组 %s 的规则\n", currentDateTime(), sg.SgID)
-
-	// 逐个替换每条规则
-	for i, ip := range newIPs {
-		// 获取当前版本（每次替换前都要获取最新版本）
-		version, err := geSG_version(sg.SgID, sg.Region, credential)
-		if err != nil {
-			return fmt.Errorf("获取安全组版本失败: %v", err)
-		}
-
-		policyIndex := int64(i)
-
-		request := vpc.NewReplaceSecurityGroupPolicyRequest()
-		request.SecurityGroupId = common.StringPtr(sg.SgID)
-
-		// 设置新规则
-		request.SecurityGroupPolicySet = &vpc.SecurityGroupPolicySet{
-			Version: version,
-			Ingress: []*vpc.SecurityGroupPolicy{
-				{
-					PolicyIndex:       common.Int64Ptr(policyIndex),
-					Protocol:          common.StringPtr(sg.Protocol),
-					Port:              common.StringPtr(sg.Ports),
-					CidrBlock:         common.StringPtr(ip),
-					Action:            common.StringPtr(sg.Action),
-					PolicyDescription: common.StringPtr(fmt.Sprintf("%s - %s", sg.Description, ip)),
-				},
-			},
-		}
-
-		// 设置原规则（用于定位要替换的规则）
-		request.OriginalSecurityGroupPolicySet = &vpc.SecurityGroupPolicySet{
-			Version: version,
-			Ingress: []*vpc.SecurityGroupPolicy{
-				{
-					PolicyIndex: common.Int64Ptr(policyIndex),
-				},
-			},
-		}
-
-		fmt.Printf("%s 正在更新规则 %d: IP %s (版本: %s)\n",
-			currentDateTime(), i, ip, *version)
-
-		_, err = client.ReplaceSecurityGroupPolicy(request)
-		if _, ok := err.(*errors.TencentCloudSDKError); ok {
-			fmt.Printf("%s API错误 (规则 %d): %s\n", currentDateTime(), i, err)
-			return err
-		}
-		if err != nil {
-			return fmt.Errorf("替换规则 %d 失败: %v", i, err)
-		}
-
-		fmt.Printf("%s 规则 %d 更新成功: %s\n", currentDateTime(), i, ip)
-
-		// 添加短暂延迟，避免API调用过于频繁
-		time.Sleep(100 * time.Millisecond)
+	// 1. 初始化客户端
+	auth, err := basic.NewCredentialsBuilder().
+		WithAk(creds.SecretID).  // 复用SecretID字段作为AK
+		WithSk(creds.SecretKey). // 复用SecretKey字段作为SK
+		SafeBuild()
+	if err != nil {
+		return fmt.Errorf("认证信息构建失败: %v", err)
 	}
 
-	fmt.Printf("%s 安全组 %s 所有规则更新完成\n", currentDateTime(), sg.SgID)
+	hcRegion, err := region.SafeValueOf(sg.Region)
+	if err != nil {
+		return fmt.Errorf("无效的区域 %s: %v", sg.Region, err)
+	}
+
+	hcClient, err := vpc.VpcClientBuilder().
+		WithRegion(hcRegion).
+		WithCredential(auth).
+		SafeBuild()
+	if err != nil {
+		return fmt.Errorf("客户端构建失败: %v", err)
+	}
+	client := vpc.NewVpcClient(hcClient)
+
+	fmt.Printf("%s 开始更新安全组 %s 的规则 (Huawei Cloud)\n", currentDateTime(), sg.SgID)
+
+	// 2. 列出当前规则，用于删除旧规则
+	listReq := &model.ListSecurityGroupRulesRequest{
+		SecurityGroupId: &sg.SgID,
+	}
+	listResp, err := client.ListSecurityGroupRules(listReq)
+	if err != nil {
+		return fmt.Errorf("获取安全组规则失败: %v", err)
+	}
+
+	// 3. 删除匹配描述的旧规则
+	// 描述匹配逻辑：包含配置中的description
+	for _, rule := range *listResp.SecurityGroupRules {
+		if strings.Contains(rule.Description, sg.Description) {
+			fmt.Printf("%s 发现旧规则 %s (Desc: %s)，准备删除\n", currentDateTime(), rule.Id, rule.Description)
+			delReq := &model.DeleteSecurityGroupRuleRequest{
+				SecurityGroupRuleId: rule.Id,
+			}
+			_, err := client.DeleteSecurityGroupRule(delReq)
+			if err != nil {
+				fmt.Printf("%s 删除规则 %s 失败: %v\n", currentDateTime(), rule.Id, err)
+			} else {
+				fmt.Printf("%s 删除规则 %s 成功\n", currentDateTime(), rule.Id)
+			}
+			// 避免API限流
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// 4. 创建新规则
+	// 解析端口
+	var portRanges [][2]int32
+	if strings.ToUpper(sg.Ports) == "ALL" {
+		portRanges = append(portRanges, [2]int32{1, 65535})
+	} else {
+		parts := strings.Split(sg.Ports, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			portNum, err := strconv.Atoi(p)
+			if err != nil {
+				fmt.Printf("%s 端口格式错误 %s: %v\n", currentDateTime(), p, err)
+				continue
+			}
+			portRanges = append(portRanges, [2]int32{int32(portNum), int32(portNum)})
+		}
+	}
+
+	protocol := strings.ToLower(sg.Protocol)
+
+	for _, ip := range newIPs {
+		// 确保IP是CIDR格式
+		cidr := ip
+		if !strings.Contains(ip, "/") {
+			cidr = ip + "/32"
+		}
+
+		for _, pr := range portRanges {
+			desc := fmt.Sprintf("%s - %s", sg.Description, ip)
+			
+			// 构造创建请求
+			createReq := &model.CreateSecurityGroupRuleRequest{
+				Body: &model.CreateSecurityGroupRuleRequestBody{
+					SecurityGroupRule: &model.CreateSecurityGroupRuleOption{
+						SecurityGroupId: sg.SgID,
+						Direction:       "ingress",
+						Protocol:        &protocol,
+						PortRangeMin:    &pr[0],
+						PortRangeMax:    &pr[1],
+						RemoteIpPrefix:  &cidr,
+						Description:     &desc,
+					},
+				},
+			}
+
+			_, err := client.CreateSecurityGroupRule(createReq)
+			if err != nil {
+				fmt.Printf("%s 创建规则失败 (IP: %s, Port: %d-%d): %v\n", currentDateTime(), ip, pr[0], pr[1], err)
+			} else {
+				fmt.Printf("%s 创建规则成功 (IP: %s, Port: %d-%d)\n", currentDateTime(), ip, pr[0], pr[1])
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	fmt.Printf("%s 安全组 %s 更新完成\n", currentDateTime(), sg.SgID)
 	return nil
 }
 
