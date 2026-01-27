@@ -71,7 +71,7 @@ description = "Home_Auto_Update"
 ```
 crontab -e ，然后添加以下内容
 # 每1小时执行一次，仅获取IP并写入文件（不更新安全组、不发钉钉）
-* */1 * * * cd /root/modifyingSecurityGroup && ./modifyingSecurityGroup_linux --minRequiredIPs 2 --maxRequiredIPs 5 --updateSG=false --notifyDingTalk=false >> /tmp/txmodSecurityGroup.log 2>&1
+* */1 * * * cd /root/modifyingSecurityGroup && ./modifyingSecurityGroupForHuaweicloud--minRequiredIPs 2 --maxRequiredIPs 5 --updateSG=false --notifyDingTalk=false >> /tmp/txmodSecurityGroup.log 2>&1
 ```
 
 #### 手动指定出口 ip(特殊情况下使用)
@@ -81,7 +81,7 @@ crontab -e ，然后添加以下内容
 * 2. 执行以下命令
 
 ```
-    ./modifyingSecurityGroup_linux -ip myips.txt
+    ./modifyingSecurityGroupForHuaweicloud -ip myips.txt
 ```
 
 #### 参数说明（获取 IP）
