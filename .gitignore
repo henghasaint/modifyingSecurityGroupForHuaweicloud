@@ -38,3 +38,4 @@ vendor
 
 modifyingSecurityGroup_linux
 ips.txt
+logs/
