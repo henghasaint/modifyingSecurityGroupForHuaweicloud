@@ -11,7 +11,6 @@
     *   **自动添加**：将新的公网 IP 添加到指定的安全组规则中。
     *   **支持多种端口配置**：支持指定单个端口、多个端口（逗号分隔）或所有端口 (`ALL`)。
 *   **钉钉通知**：当 IP 发生变化并更新安全组后，自动发送钉钉通知。
-*   **外部脚本支持**：支持在 IP 变化后执行自定义的外部脚本（如 Shell、Python、Bat）。
 
 ## 前置条件
 
@@ -109,40 +108,12 @@ crontab -e ，然后添加以下内容
  - 获取 IP 后执行 Python 脚本（Windows）：
   `modifyingSecurityGroup.exe --externalScript "C:\\path\\to\\script.py" --externalScriptArgs "arg1 arg2"`
 
-### 外部脚本示例：通过 SSH 在远程服务器批量添加 UFW 规则
-
-- 脚本位置：`ufw_update_remote.sh`
-- 功能：读取本地 `ips.txt`，使用私钥登录远程服务器，依次执行 `sudo ufw allow from <IP> to any port 6379`
-- 环境变量：
-  - `REMOTE_HOST` 必填，格式 `user@host`（如 `user@1.2.3.4`）
-  - `SSH_KEY` 可选，默认 `~/.ssh/id_myArgosy02`
-  - `IPS_FILE` 可选，默认 `ips.txt`
-
-- 赋予执行权限：
-  - `chmod +x ./ufw_update_remote.sh`
-
-- 直接执行脚本：
-  - `REMOTE_HOST=user@1.2.3.4 SSH_KEY=~/.ssh/id_myArgosy02 IPS_FILE=ips.txt ./ufw_update_remote.sh`
-
-- 由主程序调用（仅执行外部脚本，不更新安全组、不发钉钉）：
-  - `REMOTE_HOST=user@1.2.3.4 SSH_KEY=~/.ssh/id_myArgosy02 IPS_FILE=ips.txt ./modifyingSecurityGroup_linux --externalScript ./ufw_update_remote.sh --updateSG=false --notifyDingTalk=false`
-
-- 由主程序调用（先更新安全组，再执行外部脚本）：
-  - `REMOTE_HOST=user@1.2.3.4 SSH_KEY=~/.ssh/id_myArgosy02 IPS_FILE=ips.txt ./modifyingSecurityGroup_linux --externalScript ./ufw_update_remote.sh --minRequiredIPs 1 --maxRequiredIPs 5`
-
-- Cron 示例（每小时执行一次）：
-  - `* */1 * * * cd /data/workspace/projects-code/modifyingSecurityGroup && ./modifyingSecurityGroup_linux --externalScript ./ufw_update_remote.sh --externalScriptArgs '--host root@45.32.61.224 --key /home/adminer/.ssh/id_myArgosy02 --file ./ips.txt --comment "Redis whitelist for myPC_ubuntu"' --updateSG=false --notifyDingTalk=true --minRequiredIPs 1 --maxRequiredIPs 1 >> /tmp/txmodSecurityGroup.log 2>&1`
-
-- 注意：
-  - 远程服务器需已安装并启用 `ufw`，当前用户具备执行 `sudo ufw ...` 的权限。
-  - 若远程 `sudo` 需要密码，因脚本使用 `BatchMode=yes` 会失败；如需无密码自动化，请在远程配置合适的 `sudoers` 规则。
-  - `ips.txt` 为本地文件路径，外部脚本在本机读取后逐条在远程添加规则。
 
 ### 方式2，创建 cron 任务（分成两段）
 ```
 #更新华为云安全组
-0 0,2,4,6,8 * * * /data/workspace/projects-code/modifyingSecurityGroup/modifyingSG.sh 
-*/5 9-22 * * * /data/workspace/projects-code/modifyingSecurityGroup/modifyingSG.sh
+0 0,2,4,6,8 * * * /data/workspace/projects-code/modifyingSecurityGroupForHuaweicloud/modifyingSG.sh 
+*/5 9-22 * * * /data/workspace/projects-code/modifyingSecurityGroupForHuaweicloud/modifyingSG.sh
 ```
 
 ### 在 Windows 上运行
