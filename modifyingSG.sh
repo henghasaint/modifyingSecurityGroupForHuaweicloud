@@ -5,7 +5,7 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 
 # 切换到目标目录
-cd "/data/workspace/projects-code/modifyingSecurityGroup/" || {
+cd "/data/workspace/projects-code/modifyingSecurityGroupForHuaweicloud/" || {
     echo "Error: Cannot change to target directory"
     exit 1
 }
@@ -20,7 +20,7 @@ logfile="logs/execution_${datetime}.log"
 # 执行程序并记录日志
 {
     echo "[Start Time] $(date '+%Y-%m-%d %H:%M:%S')"
-    ./modifyingSecurityGroupForHuaweicloud --minRequiredIPs 1 --maxRequiredIPs 10
+    ./modifyingSecurityGroupForHuaweicloud --minRequiredIPs 1 --maxRequiredIPs 2
     echo "[End Time] $(date '+%Y-%m-%d %H:%M:%S')"
 } >> "$logfile" 2>&1
 

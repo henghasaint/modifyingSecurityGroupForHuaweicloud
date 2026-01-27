@@ -5,7 +5,7 @@ REM 设置命令行编码为UTF-8
 chcp 65001
 
 REM 切换到目标目录
-cd /d "D:\Program Files\modifyingSecurityGroup\"
+cd /d "D:\Program Files\modifyingSecurityGroupForHuaweicloud\"
 
 REM 创建日志目录（如果不存在）
 if not exist "logs\" mkdir logs
@@ -16,5 +16,5 @@ set "logfile=logs\execution_!datetime:~0,8!_!datetime:~8,6!.log"
 
 REM 执行程序并记录日志
 echo [Start Time] !date! !time! >> "!logfile!"
-modifyingSecurityGroup.exe --minRequiredIPs 2 --maxRequiredIPs 5 >> "!logfile!" 2>&1
+modifyingSecurityGroupForHuaweicloud.exe --minRequiredIPs 2 --maxRequiredIPs 5 >> "!logfile!" 2>&1
 echo [End Time] !date! !time! >> "!logfile!"
