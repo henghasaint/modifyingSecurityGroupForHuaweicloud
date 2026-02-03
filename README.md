@@ -19,10 +19,41 @@
 
 # 编译项目
 
+更新 go.mod 和 go.sum 文件
+
 ```bash
 go mod tidy
-go build -o modifyingSecurityGroupForHuaweicloud
 ```
+
+移动到 vendor 目录（可选）
+
+```bash
+go mod vendor
+go mod tidy
+```
+
+编译成 Linux 客户端
+
+```bash
+# 方式一：使用 module 依赖（推荐）
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=mod -o modifyingSecurityGroupForHuaweicloud_linux .
+
+# 方式二：使用 vendor 目录（如需完全离线或固定依赖）
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -o modifyingSecurityGroupForHuaweicloud_linux .
+```
+
+编译成 Windows 客户端
+
+```bash
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -mod=mod -o modifyingSecurityGroupForHuaweicloud.exe .
+```
+
+编译成 Mac 客户端
+
+```bash
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -mod=mod -o modifyingSecurityGroupForHuaweicloud_mac .
+```
+
 
 # 配置文件 (config.toml)
 
