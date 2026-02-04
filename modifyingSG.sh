@@ -20,7 +20,7 @@ logfile="logs/execution_${datetime}.log"
 # 执行程序并记录日志
 {
     echo "[Start Time] $(date '+%Y-%m-%d %H:%M:%S')"
-    ./modifyingSecurityGroupForHuaweicloud --minRequiredIPs 1 --maxRequiredIPs 2
+    ./modifyingSecurityGroupForHuaweicloud_linux --minRequiredIPs 1 --maxRequiredIPs 2
     echo "[End Time] $(date '+%Y-%m-%d %H:%M:%S')"
 } >> "$logfile" 2>&1
 

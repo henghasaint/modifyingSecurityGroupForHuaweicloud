@@ -319,6 +319,8 @@ func updateSecurityGroupPolicies(creds Creds, sg SecurityGroup, newIPs []string)
 
 	fmt.Printf("%s 开始更新安全组 %s 的规则 (Huawei Cloud)\n", currentDateTime(), sg.SgID)
 
+	var errs []string
+
 	// 2. 列出当前规则，用于删除旧规则
 	listReq := &model.ListSecurityGroupRulesRequest{
 		SecurityGroupId: &sg.SgID,
@@ -329,16 +331,18 @@ func updateSecurityGroupPolicies(creds Creds, sg SecurityGroup, newIPs []string)
 	}
 
 	// 3. 删除匹配描述的旧规则
-	// 描述匹配逻辑：包含配置中的description
+	// 描述匹配逻辑：包含配置中的description，且方向为ingress
 	for _, rule := range *listResp.SecurityGroupRules {
-		if strings.Contains(rule.Description, sg.Description) {
-			fmt.Printf("%s 发现旧规则 %s (Desc: %s)，准备删除\n", currentDateTime(), rule.Id, rule.Description)
+		if strings.Contains(rule.Description, sg.Description) && rule.Direction == "ingress" {
+			fmt.Printf("%s 发现旧规则 %s (Desc: %s, Dir: %s)，准备删除\n", currentDateTime(), rule.Id, rule.Description, rule.Direction)
 			delReq := &model.DeleteSecurityGroupRuleRequest{
 				SecurityGroupRuleId: rule.Id,
 			}
 			_, err := client.DeleteSecurityGroupRule(delReq)
 			if err != nil {
-				fmt.Printf("%s 删除规则 %s 失败: %v\n", currentDateTime(), rule.Id, err)
+				errMsg := fmt.Sprintf("删除规则 %s 失败: %v", rule.Id, err)
+				fmt.Printf("%s %s\n", currentDateTime(), errMsg)
+				errs = append(errs, errMsg)
 			} else {
 				fmt.Printf("%s 删除规则 %s 成功\n", currentDateTime(), rule.Id)
 			}
@@ -397,12 +401,18 @@ func updateSecurityGroupPolicies(creds Creds, sg SecurityGroup, newIPs []string)
 
 			_, err := client.CreateSecurityGroupRule(createReq)
 			if err != nil {
-				fmt.Printf("%s 创建规则失败 (IP: %s, Port: %d-%d): %v\n", currentDateTime(), ip, pr[0], pr[1], err)
+				errMsg := fmt.Sprintf("创建规则失败 (IP: %s, Port: %d-%d): %v", ip, pr[0], pr[1], err)
+				fmt.Printf("%s %s\n", currentDateTime(), errMsg)
+				errs = append(errs, errMsg)
 			} else {
 				fmt.Printf("%s 创建规则成功 (IP: %s, Port: %d-%d)\n", currentDateTime(), ip, pr[0], pr[1])
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("安全组更新存在错误: %s", strings.Join(errs, "; "))
 	}
 
 	fmt.Printf("%s 安全组 %s 更新完成\n", currentDateTime(), sg.SgID)

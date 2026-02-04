@@ -156,13 +156,13 @@ crontab -e ，然后添加以下内容
 - 创建非高峰时段任务（00:00-08:59，每 2 小时）
 
 ```cmd
-schtasks /create /tn "modifyingSecurityGroup_OffPeak" /tr "\"D:\Program Files\modifyingSecurityGroup\modifyingSG.bat\"" /sc DAILY /st 00:00 /ri 120 /du 08:59 /ed 9999/12/31 /ru "SYSTEM" /rl HIGHEST /f
+schtasks /create /tn "modifyingSecurityGroup_OffPeak" /tr "\"D:\Program Files\modifyingSecurityGroupForHuaweicloud\modifyingSG.bat\"" /sc DAILY /st 00:00 /ri 120 /du 08:59 /ed 9999/12/31 /ru "SYSTEM" /rl HIGHEST /f
 ```
 
 - 创建高峰时段任务（09:00-22:00，每 5 分钟）
 
 ```cmd
-schtasks /create /tn "modifyingSecurityGroup_Peak" /tr "\"D:\Program Files\modifyingSecurityGroup\modifyingSG.bat\"" /sc DAILY /st 09:00 /ri 5 /du 13:00 /ed 9999/12/31 /ru "SYSTEM" /rl HIGHEST /f
+chtasks /create /tn "modifyingSecurityGroup_Peak" /tr "\"C:\modifyingSecurityGroupForHuaweicloud\modifyingSG.bat\"" /sc DAILY /st 09:00 /ri 5 /du 13:00 /ed 9999/12/31 /ru "SYSTEM" /rl HIGHEST /f
 ```
 
 #### 参数说明
